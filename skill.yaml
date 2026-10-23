@@ -1,0 +1,43 @@
+version: "1.0.0"
+name: "open-pr-reviewer"
+description: "Offline, zero-API-key automated code review agent skill that audits git unified diffs."
+author: "Open PR Reviewer Team"
+license: "MIT"
+repository: "https://github.com/<your-username>/open-pr-reviewer"
+entrypoint: "server.js"
+
+interface:
+  inputs:
+    diff:
+      type: "string"
+      description: "Unified git diff of the pull request to review."
+      required: true
+    model:
+      type: "string"
+      description: "Local Ollama model identifier (default: codellama:7b)."
+      default: "codellama:7b"
+      required: false
+  outputs:
+    source:
+      type: "string"
+      description: "Execution engine used (ollama or offline-heuristic-fallback)."
+    reviews:
+      type: "array"
+      items:
+        type: "object"
+        properties:
+          file:
+            type: "string"
+            description: "Target file path."
+          line:
+            type: "integer"
+            description: "Line number where the issue was detected."
+          severity:
+            type: "string"
+            enum: ["CRITICAL", "WARNING", "SUGGESTION", "STYLE"]
+          issue:
+            type: "string"
+            description: "Summary of detected flaw or code smell."
+          fix:
+            type: "string"
+            description: "Suggested code patch or remediation advice."

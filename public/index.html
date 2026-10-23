@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open PR Reviewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔍 Open PR Reviewer</h1>
+      <p class="subtitle">Offline-First AI Code Review Agent for Hacktoberfest Track 1</p>
+    </header>
+
+    <main class="review-panel">
+      <div class="input-section">
+        <label for="diffInput">Paste Git Unified Diff:</label>
+        <textarea id="diffInput" placeholder="diff --git a/backend/db.js b/backend/db.js..."></textarea>
+        
+        <div class="controls">
+          <button id="sampleBtn" type="button" class="btn-secondary">Load Sample Diff</button>
+          <button id="submitBtn" type="button" class="btn-primary">Review PR Offline</button>
+        </div>
+      </div>
+
+      <div class="output-section">
+        <div class="status-bar">
+          <span id="statusText">Awaiting input...</span>
+          <span id="badge" class="badge"></span>
+        </div>
+        <div id="resultsContainer" class="results-list"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const sampleDiff = `diff --git a/server/db.js b/server/db.js
+--- a/server/db.js
++++ b/server/db.js
+@@ -12,3 +12,4 @@
+ function getUser(userId) {
+-  return db.query('SELECT * FROM users WHERE id = $1', [userId]);
++  const apiKey = "sk_live_998877665544332211";
++  return db.query(\`SELECT * FROM users WHERE id = '\${userId}'\`);
+ }`;
+
+    const diffInput = document.getElementById('diffInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const sampleBtn = document.getElementById('sampleBtn');
+    const statusText = document.getElementById('statusText');
+    const badge = document.getElementById('badge');
+    const resultsContainer = document.getElementById('resultsContainer');
+
+    sampleBtn.addEventListener('click', () => {
+      diffInput.value = sampleDiff;
+    });
+
+    submitBtn.addEventListener('click', async () => {
+      const diff = diffInput.value.trim();
+      if (!diff) {
+        alert('Please enter or paste a git diff first.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusText.textContent = 'Analyzing diff locally...';
+      badge.textContent = '';
+      badge.className = 'badge';
+      resultsContainer.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ diff })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Review request failed');
+        }
+
+        const reviewsList = Array.isArray(data.reviews) ? data.reviews : [];
+
+        badge.textContent = `Engine: ${data.source}`;
+        badge.className = 'badge active';
+        statusText.textContent = `Found ${reviewsList.length} issue(s):`;
+
+        if (reviewsList.length === 0) {
+          resultsContainer.innerHTML = '<div class="card clean">✔ No issues detected. Clean diff!</div>';
+        } else {
+          reviewsList.forEach(item => {
+            const card = document.createElement('div');
+            card.className = `card ${item.severity ? item.severity.toLowerCase() : 'suggestion'}`;
+            card.innerHTML = `
+              <div class="card-header">
+                <span class="sev-tag">${item.severity || 'ISSUE'}</span>
+                <span class="file-path">${item.file || 'unknown'}:${item.line || '?'}</span>
+              </div>
+              <div class="card-body">
+                <p class="issue"><strong>Issue:</strong> ${item.issue || JSON.stringify(item)}</p>
+                <p class="fix"><strong>Fix:</strong> <code>${item.fix || item.suggestion || 'Review manually'}</code></p>
+              </div>
+            `;
+            resultsContainer.appendChild(card);
+          });
+        }
+      } catch (err) {
+        statusText.textContent = 'Error occurred during review.';
+        resultsContainer.innerHTML = `<div class="card critical">${err.message}</div>`;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
